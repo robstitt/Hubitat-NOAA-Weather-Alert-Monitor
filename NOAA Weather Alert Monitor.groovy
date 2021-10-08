@@ -16,10 +16,12 @@
  *  for the specific language governing permissions and limitations under the License.
  *
  *
- * Last Update: 06/11/2021
+ * Last Update: 10/08/2021
+ *   - Correct case on array values passed to NOAA API
+ *   - Use "alerts/active" API so only active alerts are returned
  */
 
-static String version() { return "1.0.001" }
+static String version() { return "1.0.002" }
 
 import groovy.transform.Field
 import groovy.json.*
@@ -83,25 +85,25 @@ def ConfigPage() {
 
          input name: "whatAlertSeverity", type: "enum", title: "Monitored severities: ", required: true, multiple: true, submitOnChange: true,
             options: [
-               "minor": "Minor",
-               "moderate": "Moderate",
-               "severe": "Severe",
-               "extreme": "Extreme"
-            ], defaultValue: ["severe", "extreme"]
+               "Minor": "Minor",
+               "Moderate": "Moderate",
+               "Severe": "Severe",
+               "Extreme": "Extreme"
+            ], defaultValue: ["Severe", "Extreme"]
 
          input name: "whatAlertUrgency", type: "enum", title: "Monitored urgencies (recommend all): ", required: true, multiple: true, submitOnChange: true,
             options: [
-               "immediate": "Immediate",
-               "expected": "Expected",
-               "future": "Future"
-            ], defaultValue: ["immediate", "expected", "future"]
+               "Immediate": "Immediate",
+               "Expected": "Expected",
+               "Future": "Future"
+            ], defaultValue: ["Immediate", "Expected", "Future"]
 
          input name: "whatAlertCertainty", type: "enum", title: "Monitored certainties (recommend all): ", required: true, multiple: true, submitOnChange: true,
             options: [
-               "possible": "Possible",
-               "likely": "Likely",
-               "observed": "Observed"
-            ], defaultValue: ["possible", "likely", "observed"]
+               "Possible": "Possible",
+               "Likely": "Likely",
+               "Observed": "Observed"
+            ], defaultValue: ["Possible", "Likely", "Observed"]
 
          input name: "whatPoll", type: "enum", title: "Poll Frequency (when no alerts are active; always 1 min when watches or warnings are active): ", required: true, multiple: false, submitOnChange: true,
             options: [
@@ -520,7 +522,7 @@ Map getWeatherAlerts() {
       longitude = "${location.longitude}".toString()
    }
 
-   String wxURI = "https://api.weather.gov/alerts?point=${latitude}%2C${longitude}&status=actual&message_type=alert".toString()
+   String wxURI = "https://api.weather.gov/alerts/active?point=${latitude}%2C${longitude}&status=actual&message_type=alert".toString()
    Map result = [:]
 
    // Build out the API options
