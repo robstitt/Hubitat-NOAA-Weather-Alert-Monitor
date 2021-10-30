@@ -1,6 +1,6 @@
 /*  ****************  NOAA Weather Alert Device Driver  ****************
  *
- *  importUrl: xxx
+ *  importUrl: https://github.com/robstitt/Hubitat-NOAA-Weather-Alert-Monitor/raw/main/NOAA%20Virtual%20Device%20Driver.groovy
  *
  *  Copyright 2019 Aaron Ward
  *  Copyright 2021 Robert L. Stitt
@@ -16,7 +16,8 @@
  *  for the specific language governing permissions and limitations under the License.
  *
  *
- * Last Update: 01/21/2021
+ * Last Update: 10/30/2021
+ *    - Updated to include URL links to Github
  */
 
 metadata {
@@ -24,7 +25,7 @@ metadata {
       name: "NOAA Weather Alert Device",
       namespace: "robstitt",
       author: "Robert L. Stitt"
-      //importUrl: "https://raw.githubusercontent.com/imnotbob/Hubitat-4/master/NOAA/NOAA-Tile-Driver.groovy"
+      //importUrl: "https://github.com/robstitt/Hubitat-NOAA-Weather-Alert-Monitor/raw/main/NOAA%20Virtual%20Device%20Driver.groovy"
        ) {
       command "initialize"
       command "refresh"
@@ -76,7 +77,7 @@ def refresh() {
 
    try { noaaData = (Map)parent.getAlertDevice() }
    catch (e) {if(logEnable) log.warn "Error getting most severe weather alert data from parent NOAA Weather Alert Monitor App: $e"}
- 
+
    if(noaaData.text==null) {
       noaaData = [text:"None", level:"-", urgency:"-", certainty:"-", severity:"-", eventtype:"-", expires:"-"]
       if(logEnable) log.warn "Null alert data received from the parent NOAA Weather Alert Monitor App"
@@ -89,7 +90,7 @@ def refresh() {
             log.info "Clearing alert based on no active alert received from the parent NOAA Weather Alert Monitor App"
         }
     }
-    
+
     sendEvent(name: "Text", value: noaaData.text, displayed: true)
     sendEvent(name: "Level", value: noaaData.level, displayed: true)
     sendEvent(name: "Urgency", value: noaaData.urgency, displayed: true)
