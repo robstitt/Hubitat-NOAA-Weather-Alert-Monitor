@@ -1,6 +1,6 @@
 /*  **************** NOAA Weather Alerts ****************
  *
- *  Hubitat Import URL:
+ *  Hubitat Import URL: https://github.com/robstitt/Hubitat-NOAA-Weather-Alert-Monitor/raw/main/NOAA%20Weather%20Alert%20Monitor.groovy
  *
  *  Copyright 2019 Aaron Ward
  *  Copyright 2021 Robert L. Stitt
@@ -22,6 +22,7 @@
  * Last Update: 10/30/2021
  *   - Correct case on array values used elsewhere, related to the NOAA API
  *   - Correct the app's description in the header
+ *   - Add URL links in source code/comments to Githug locations
  */
 
 static String version() { return "1.0.003" }
@@ -43,7 +44,7 @@ definition(
    iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
    iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
    iconX3Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
-// documentationLink: "https://github.com/imnotbob/Hubitat-4/blob/master/NOAA/README.md",
+   documentationLink: "https://github.com/robstitt/Hubitat-NOAA-Weather-Alert-Monitor/raw/main/README.md",
    singleInstance: true,
    oauth: false,
    pausable: true)
