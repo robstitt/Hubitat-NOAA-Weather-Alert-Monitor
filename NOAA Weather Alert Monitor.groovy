@@ -15,10 +15,12 @@
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
  *  for the specific language governing permissions and limitations under the License.
  *
- *
  * Last Update: 10/08/2021
  *   - Correct case on array values passed to NOAA API
  *   - Use "alerts/active" API so only active alerts are returned
+ *
+ * Last Update: 10/30/2021
+ *   - Correct case on array values used elsewhere, related to the NOAA API
  */
 
 static String version() { return "1.0.002" }
@@ -79,7 +81,7 @@ def ConfigPage() {
          paragraph "Configure the event types and other values, how often to poll for weather information, set custom coordinates, set a switch to use when monitored events are detected."
 
          buildEventsList()
-          
+
          input "monitoredWeatherEvents", "enum", title: "Select all weather events to monitor: ", required: false, multiple: true, submitOnChange: true,
             options: state.eventTypes
 
@@ -128,7 +130,7 @@ def ConfigPage() {
          if(UsealertSwitch) {
             input (name: "alertSwitch", type: "capability.switch", title: "Select a switch to turn ON with Alert?", multiple: false, required: false, defaultValue: false, submitOnChange: true)
          }
-         
+
          main()
       }
    }
@@ -166,18 +168,18 @@ def DebugPage() {
          input "testAPI", "bool", title: "Invoke and test the NOAA Weather Alert API now?", required: false, submitOnChange: true, defaultValue: false
          if(testAPI) {
             app.updateSetting("testAPI",[value:"false",type:"bool"])
-             
+
             getAlertMsg()
-             
+
             if(HighestAlert.text!="None") {
                Date date = new Date()
                SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy h:mm a")
-                 
+
                temp = "<hr><br>Current poll of Weather API: ${sdf.format(date)}<br/><br/>URI: <a href='${state.wxURI}' target=_blank>${state.wxURI}</a><br><br>"
                paragraph temp
-              
+
                String testConfig = ""
-            
+
                testConfig += "<table border=1px>"
                testConfig += "<tr><td>Text</td><td>Value</td></tr><tr><td>Severity</td><td>${HighestAlert.alertseverity}</td></tr>"
                testConfig += "<tr><td>Level</td><td>${HighestAlert.text}</td></tr>"
@@ -225,17 +227,17 @@ void callRefreshAlertDevice(){
     if(noaaAlertDevice) {
        noaaAlertDevice.refresh()
     } else {
-       if(logEnable) log.warn "No child alert device found to refresh"  
+       if(logEnable) log.warn "No child alert device found to refresh"
     }
 }
 
 void setAlertSwitch(){
    if(HighestAlert.text!=null && HighestAlert.text!="None"){
        if(UsealertSwitch && alertSwitch && alertSwitch.currentState("switch").value == "off") {
-           if(logEnable) log.info "Turning the weather alert switch On" 
+           if(logEnable) log.info "Turning the weather alert switch On"
            alertSwitch.on()
        }
-   } else {    
+   } else {
        if(UsealertSwitch && alertSwitch && alertSwitch.currentState("switch").value == "on") {
            if(logEnable) log.info "Turning the weather alert switch Off"
            alertSwitch.off()
@@ -263,7 +265,7 @@ void getAlertMsg() {
       if (debugEnable) log.debug "Weather API returned ${result.features.size().toString()} entries"
       for(i=0; i<result.features.size();i++) {
          if(debugEnable) log.debug "In weather event loop, i=${i.toString()}"
-          
+
          String  alertstatus
          String  alerttext
          String  alerturgency
@@ -286,7 +288,7 @@ void getAlertMsg() {
          alertcertainty = result.features[i].properties.certainty
          alertseverity  = result.features[i].properties.severity
          alerteventtype = result.features[i].properties.event
-          
+
          if(debugEnable) log.debug "Status: $alertstatus"
          if(debugEnable) log.debug "Text: $alerttext"
          if(debugEnable) log.debug "Urgency: $alerturgency"
@@ -299,7 +301,7 @@ void getAlertMsg() {
          else if (alerturgency=="immediate" || alertcertainty=="observed") alertlevel="Warning"
          else if (alerturgency=="expected" || alertcertainty=="likely") alertlevel="Watch"
          else alertlevel="Other"
-             
+
          if(debugEnable) log.debug "Level: $alertlevel"
 
          //alert starts
@@ -307,7 +309,7 @@ void getAlertMsg() {
          else if(result.features[i].properties.effective) alertstarts = result.features[i].properties.effective
          else if(result.features[i].properties.sent) alertstarts = result.features[i].properties.sent
          else alertstarts = timestamp
-         
+
          if(debugEnable) log.debug "Starts: $alertstarts"
 
          try {
@@ -321,7 +323,7 @@ void getAlertMsg() {
          //alert expiration
          if(result.features[i].properties.ends) alertexpires = result.features[i].properties.ends
          else alertexpires = result.features[i].properties.expires
-         
+
          if(debugEnable) log.debug "Expires: $alertexpires"
 
          try {
@@ -337,7 +339,7 @@ void getAlertMsg() {
          // Only deal with this alert if it is actual and has started and hasn't expired yet
          if((alertstatus="Actual") && (dtalertstarts <= curtime) && (dtalertexpires > curtime)) {
              if(debugEnable) log.debug "Alert is active: ${alerttext}"
-             
+
             // Only review this alert if it is a monitored event type
             if (   ( !(monitoredWeatherEvents) || (monitoredWeatherEvents.size() == 0)
                      || (monitoredWeatherEvents && monitoredWeatherEvents*.toLowerCase().contains(alerteventtype.toLowerCase())) )
@@ -349,7 +351,7 @@ void getAlertMsg() {
                      || (whatAlertCertainty && whatAlertCertainty*.toLowerCase().contains(alertcertainty.toLowerCase())) )  ) {
 
                if(debugEnable) log.debug "Alert is a selected event type: ${alerttext}"
-                
+
                boolean thisishigher = false
 
                // Compare the current alert to the highest alert previously returned
@@ -382,7 +384,7 @@ void getAlertMsg() {
                   catch (e) {higherseverity = 1}
 
                   if(debugEnable) log.debug "Alert compared to previous: Level=${higherlevel}, Urgency=${higherurgency}, Certainty=${highercertainty}, Severity=${higherseverity}"
-                   
+
                   if (((alerturgency.toLowerCase() == "immediate") || (alertcertainty.toLowerCase() == "observed")) && (alertlevel.toLowerCase() == "warning")) {
                      if (higherseverity==1) thisishigher = true
                   } else if (higherlevel==1) {
@@ -529,7 +531,7 @@ Map getWeatherAlerts() {
    if(whatAlertUrgency != null) wxURI = wxURI + "&urgency=${whatAlertUrgency.join(",")}".toString()
 
    if(whatAlertSeverity != null) wxURI = wxURI + "&severity=${whatAlertSeverity.join(",")}".toString()
-   else wxURI = wxURI + "&severity=severe"
+   else wxURI = wxURI + "&severity=Severe"
 
    if(whatAlertCertainty !=null) wxURI = wxURI + "&certainty=${whatAlertCertainty.join(",")}".toString()
 
@@ -547,13 +549,13 @@ Map getWeatherAlerts() {
    try {
       httpGet(requestParams)  { response -> result = response.data }
    }
-   catch (e) { 
-      if(logEnable) log.warn "The API Weather.gov did not return a response (retaining previous results), exception: $e" 
+   catch (e) {
+      if(logEnable) log.warn "The API Weather.gov did not return a response (retaining previous results), exception: $e"
       result = LastAlertResult.clone()
    }
-    
+
    LastAlertResult = result.clone()
-    
+
    return result
 }
 
@@ -562,9 +564,9 @@ void checkState() {
    if(logEnable==null) app.updateSetting("logEnable",[value:"false",type:"bool"])
    if(debugEnable==null) app.updateSetting("debugEnable",[value:"false",type:"bool"])
    if(logMinutes==null) app.updateSetting("logMinutes",[value:15,type:"number"])
-   if(whatAlertSeverity==null) app.updateSetting("whatAlertSeverity",[value:["severe","extreme"],type:"enum"])
-   if(whatAlertUrgency==null) app.updateSetting("whatAlertUrgency",[value:["immediate", "expected", "future"],type:"enum"])
-   if(whatAlertCertainty==null) app.updateSetting("whatAlertCertainty",[value:["possible", "likely", "observed"],type:"enum"])
+   if(whatAlertSeverity==null) app.updateSetting("whatAlertSeverity",[value:["Severe","Extreme"],type:"enum"])
+   if(whatAlertUrgency==null) app.updateSetting("whatAlertUrgency",[value:["Immediate", "Expected", "Future"],type:"enum"])
+   if(whatAlertCertainty==null) app.updateSetting("whatAlertCertainty",[value:["Possible", "Likely", "Observed"],type:"enum"])
 }
 
 void installCheck(){
