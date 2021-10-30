@@ -21,9 +21,10 @@
  *
  * Last Update: 10/30/2021
  *   - Correct case on array values used elsewhere, related to the NOAA API
+ *   - Correct the app's description in the header
  */
 
-static String version() { return "1.0.002" }
+static String version() { return "1.0.003" }
 
 import groovy.transform.Field
 import groovy.json.*
@@ -636,7 +637,7 @@ void uninstalled() {
 static String UIsupport(String type, String txt) {
    switch(type) {
       case "logo":
-         return "<table border=0><thead><tr><th><img border=0 style='max-width:100px' src='https://raw.githubusercontent.com/imnotbob/Hubitat-4/master/NOAA/Support/NOAA.png'></th><th style='padding:10px' align=left><font style='font-size:34px;color:#1A77C9;font-weight: bold'>NOAA Weather Alerts</font><br><font style='font-size:14px;font-weight: none'>This application provides customized Weather Alert announcements.</font></tr></thead></table><br><hr style='margin-top:-15px;background-color:#1A77C9; height: 1px; border: 0;'></hr>"
+         return "<table border=0><thead><tr><th><img border=0 style='max-width:100px' src='https://raw.githubusercontent.com/imnotbob/Hubitat-4/master/NOAA/Support/NOAA.png'></th><th style='padding:10px' align=left><font style='font-size:34px;color:#1A77C9;font-weight: bold'>NOAA Weather Alerts</font><br><font style='font-size:14px;font-weight: none'>This application retrieves information on the highest, currently effective weather alert.</font></tr></thead></table><br><hr style='margin-top:-15px;background-color:#1A77C9; height: 1px; border: 0;'></hr>"
          break
       case "line":
          return "<hr style='background-color:#1A77C9; height: 1px; border: 0;'></hr>"
