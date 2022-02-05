@@ -1,6 +1,6 @@
 /*  **************** NOAA Weather Alerts ****************
  *
- *  Hubitat Import URL: https://github.com/robstitt/Hubitat-NOAA-Weather-Alert-Monitor/raw/main/NOAA%20Weather%20Alert%20Monitor.groovy
+ *  Hubitat Import URL:
  *
  *  Copyright 2019 Aaron Ward
  *  Copyright 2021 Robert L. Stitt
@@ -22,10 +22,14 @@
  * Last Update: 10/30/2021
  *   - Correct case on array values used elsewhere, related to the NOAA API
  *   - Correct the app's description in the header
- *   - Add URL links in source code/comments to Githug locations
+ *
+ * Last Update: 02/05/2022 (v1.1.000)
+ *   - Add the ability to specify the "Level" for each eventtype (rather than trying to automatically calculate it)
+ *   - Add the ability to test an alert level of "Other"
+ *   - Add the ability to set the length of the test alerts
  */
 
-static String version() { return "1.0.003" }
+static String version() { return "1.1.000" }
 
 import groovy.transform.Field
 import groovy.json.*
@@ -44,7 +48,7 @@ definition(
    iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
    iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
    iconX3Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
-   documentationLink: "https://github.com/robstitt/Hubitat-NOAA-Weather-Alert-Monitor/raw/main/README.md",
+// documentationLink: "https://github.com/imnotbob/Hubitat-4/blob/master/NOAA/README.md",
    singleInstance: true,
    oauth: false,
    pausable: true)
@@ -55,19 +59,25 @@ preferences {
    page name: "DebugPage", title: "", install: false, uninstall: true, nextPage: "mainPage"
 }
 
-@Field static Map LastAlertResult=[:]
-@Field static Map HighestAlert=[:]
-@Field static Map SavedRealAlert=[:]
+@Field static Map     LastAlertResult=[:]
+@Field static Map     HighestAlert=[:]
+@Field static Map     SavedRealAlert=[:]
 @Field static boolean TestInProgress=false
+
+@Field static Integer defaultTestAlertLengthSeconds=30
+
 
 def mainPage() {
    dynamicPage(name: "mainPage") {
       installCheck()
       if((String)state.appInstalled == 'COMPLETE') {
          section(UIsupport("logo","")) {
-            if(whatAlertSeverity || whatPoll || monitoredWeatherEvents || whatAlertUrgency || whatAlertCertainty) href(name: "ConfigPage", title: "${UIsupport("configured","")} Weather Alert Settings", required: false, page: "ConfigPage", description: "Settings for the weather alerts to be monitored")
-            else  href(name: "ConfigPage", title: "${UIsupport("attention","")} Weather Alert Settings", required: false, page: "ConfigPage", description: "Change default settings for weather alerts to monitor")
-
+            if(whatAlertSeverity || whatPoll || monitoredWeatherEventsWarning || monitoredWeatherEventsWatch || monitoredWeatherEventsOther || whatAlertUrgency || whatAlertCertainty) {
+                href(name: "ConfigPage", title: "${UIsupport("configured","")} Weather Alert Settings", required: false, page: "ConfigPage", description: "Settings for the weather alerts to be monitored")
+            } else {
+                href(name: "ConfigPage", title: "${UIsupport("attention","")} Weather Alert Settings", required: false, page: "ConfigPage", description: "Change default settings for weather alerts to monitor")
+            }
+                
             href(name: "DebugPage", title: "Debugging", required: false, page: "DebugPage", description: "Debug and Test Options")
             paragraph UIsupport("line","")
             paragraph UIsupport("footer","")
@@ -82,11 +92,38 @@ def ConfigPage() {
          paragraph UIsupport("header", " Weather Event Settings")
          paragraph "Configure the event types and other values, how often to poll for weather information, set custom coordinates, set a switch to use when monitored events are detected."
 
-         buildEventsList()
+         List<String> tempAllEvents = []
+         List<String> tempWarningEvents = []
+         List<String> tempWatchEvents = []
+         List<String> tempOtherEvents = []
+          
+         if (monitoredWeatherEventsWarning) tempWarningEvents = monitoredWeatherEventsWarning
+         if (monitoredWeatherEventsWatch)   tempWatchEvents   = monitoredWeatherEventsWatch
+         if (monitoredWeatherEventsOther)   tempOtherEvents   = monitoredWeatherEventsOther
+         
+         buildEventsList() 
+       
+         if (state.eventTypes) tempAllEvents = state.eventTypes
+          
+         List<String> possibleWarningEvents = ((tempAllEvents - tempWatchEvents) - tempOtherEvents)
+          
+         input "monitoredWeatherEventsWarning", "enum", title: "Select all weather events to monitor as a Level=\"Warning\" event: ", required: false, multiple: true, submitOnChange: true,
+            options: possibleWarningEvents
 
-         input "monitoredWeatherEvents", "enum", title: "Select all weather events to monitor: ", required: false, multiple: true, submitOnChange: true,
-            options: state.eventTypes
+         if (monitoredWeatherEventsWarning) tempWarningEvents = monitoredWeatherEventsWarning
+         List<String> possibleWatchEvents = ((tempAllEvents - tempWarningEvents) - tempOtherEvents)
+          
+         input "monitoredWeatherEventsWatch", "enum", title: "Select all weather events to monitor as a Level=\"Watch\" event: ", required: false, multiple: true, submitOnChange: true,
+            options: possibleWatchEvents
 
+         if (monitoredWeatherEventsWatch)   tempWatchEvents = monitoredWeatherEventsWatch
+         List<String> possibleOtherEvents = ((tempAllEvents - tempWarningEvents) - tempWatchEvents)
+
+         input "monitoredWeatherEventsOther", "enum", title: "Select all weather events to monitor as a Level=\"Other\" event: ", required: false, multiple: true, submitOnChange: true,
+            options: possibleOtherEvents       
+
+         if (monitoredWeatherEventsOther)  tempOtherEvents = monitoredWeatherEventsOther
+          
          input name: "whatAlertSeverity", type: "enum", title: "Monitored severities: ", required: true, multiple: true, submitOnChange: true,
             options: [
                "Minor": "Minor",
@@ -147,13 +184,26 @@ def DebugPage() {
          input "logEnable", "bool", title: "Enable Normal Logging?", required: false, defaultValue: true, submitOnChange: true
 
          input "debugEnable", "bool", title: "Enable Debug Logging?", required: false, defaultValue: false, submitOnChange: true
+          
+         input "testAlertLengthSeconds", "number", title: "Test Alert length in seconds (10-3600):", required: true, defaultValue: defaultTestAlertLengthSeconds, range: "10..3600", submitOnChange: true
 
-         input "runTest", "enum", title: "Run a test Alert?", required: true, multiple: false, submitOnChange: true,
+         Integer tempTestAlertLength = defaultTestAlertLengthSeconds
+         if (testAlertLengthSeconds!=null) {
+             if ((testAlertLengthSeconds<10) || (testAlertLengthSeconds>3600)) {
+                 app.updateSetting("testAlertLengthSeconds",[value:defaultTestAlertLengthSeconds,type:"number"])
+             } else {
+                 tempTestAlertLength = testAlertLengthSeconds
+             }
+         }
+          
+         input "runTest", "enum", title: "Run a test Alert (for ${tempTestAlertLength.toString()} seconds)?", required: true, multiple: false, submitOnChange: true,
             options: [
                "no": "No",
+               "other": "Other",
                "watch": "Watch",
                "warning": "Warning"
             ], defaultValue: "No"
+          
          if(runTest!=null && runTest!="no") {
             runtestAlert(runTest)
             app.updateSetting("runTest",[value:"no",type:"enum"])
@@ -260,6 +310,14 @@ void getAlertMsg() {
    Map certaintymap = [possible:1, likely:2, observed:3]
    Map severitymap  = [minor:1, moderate:2, severe:3, extreme:4]
 
+   List<String> monitoredWeatherEvents
+
+   monitoredWeatherEvents = []
+          
+   if (monitoredWeatherEventsWarning) monitoredWeatherEvents = monitoredWeatherEvents + monitoredWeatherEventsWarning
+   if (monitoredWeatherEventsWatch)   monitoredWeatherEvents = monitoredWeatherEvents + monitoredWeatherEventsWatch
+   if (monitoredWeatherEventsOther)   monitoredWeatherEvents = monitoredWeatherEvents + monitoredWeatherEventsOther
+
    if(result) {
       Date curtime = new Date()
       String timestamp = curtime.format("yyyy-MM-dd'T'HH:mm:ssXXX")
@@ -283,7 +341,7 @@ void getAlertMsg() {
          Integer alertcertaintynum
          Integer alertseveritynum
          Integer alertlevelnum
-
+                    
          alertstatus    = (String)result.features[i].properties.status
          alerttext      = (String)result.features[i].properties.headline
          alerturgency   = result.features[i].properties.urgency
@@ -298,12 +356,12 @@ void getAlertMsg() {
          if(debugEnable) log.debug "Severity: $alertseverity"
          if(debugEnable) log.debug "EventType: $alerteventtype"
 
-         if      (alerttext.toLowerCase().contains("warning")) alertlevel = "Warning"
-         else if (alerttext.toLowerCase().contains("watch")) alertlevel = "Watch"
-         else if (alerturgency=="immediate" || alertcertainty=="observed") alertlevel="Warning"
-         else if (alerturgency=="expected" || alertcertainty=="likely") alertlevel="Watch"
-         else alertlevel="Other"
-
+         if      ( !(monitoredWeatherEventsWarning) || (monitoredWeatherEventsWarning.size() == 0)
+                   || (monitoredWeatherEventsWarning && monitoredWeatherEventsWarning*.toLowerCase().contains(alerteventtype.toLowerCase())) ) alertlevel="Warning"
+         else if ( !(monitoredWeatherEventsWatch) || (monitoredWeatherEventsWatch.size() == 0)
+                   || (monitoredWeatherEventsWatch && monitoredWeatherEventsWatch*.toLowerCase().contains(alerteventtype.toLowerCase())) ) alertlevel="Watch"
+         else alertLevel="Other" 
+          
          if(debugEnable) log.debug "Level: $alertlevel"
 
          //alert starts
@@ -427,6 +485,9 @@ void getAlertMsg() {
 }
 
 void runtestAlert(level) {
+    Integer lengthSeconds=defaultTestAlertLengthSeconds
+    if (testAlertLengthSeconds!=null) lengthSeconds = testAlertLengthSeconds
+    
     TestInProgress=true
     if (HighestAlert==null || HighestAlert.text==null || HighestAlert.level==null) {
         if (debugEnable) log.debug "Initializing Highest Alert variable (it was null)"
@@ -435,12 +496,13 @@ void runtestAlert(level) {
 
     SavedRealAlert = HighestAlert.clone()
     HighestAlert = emptyAlert()
-    if(logEnable) log.info "Initiating a test ${level} alert (saving the current Highest Alert: ${SavedRealAlert.level}(${SavedRealAlert.text}))"
+    if(logEnable) log.info "Initiating a test ${level} alert for ${lengthInSeconds.toString()} (saving the current Highest Alert: ${SavedRealAlert.level}(${SavedRealAlert.text}))"
     if(level=="warning") HighestAlert=buildTestWarningAlert()
     if(level=="watch")   HighestAlert=buildTestWatchAlert()
+    if(level=="other")   HighestAlert=buildTestOtherAlert()    
     setAlertSwitch()
     callRefreshAlertDevice()
-    runIn(30,endTest)
+    runIn(lengthSeconds,endTest)
 }
 
 void endTest(){
@@ -452,6 +514,13 @@ void endTest(){
    callRefreshAlertDevice()
 }
 
+                  
+Map buildTestOtherAlert() {
+   Date date = new Date()
+   String timestamp = date.format("yyyy-MM-dd'T'HH:mm:ssXXX")
+   return [text:"Test Other", level:"Other", urgency:"Expected", certainty:"Likely", severity:"Severe", eventtype:"Test Other", expires:"${timestamp}"]
+}
+                 
 Map buildTestWatchAlert() {
    Date date = new Date()
    String timestamp = date.format("yyyy-MM-dd'T'HH:mm:ssXXX")
