@@ -3,7 +3,7 @@
  *  Hubitat Import URL:
  *
  *  Copyright 2019 Aaron Ward
- *  Copyright 2021 Robert L. Stitt
+ *  Copyright 2021-2022 Robert L. Stitt
  *
  *-------------------------------------------------------------------------------------------------------------------
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
