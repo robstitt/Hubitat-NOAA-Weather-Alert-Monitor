@@ -27,9 +27,12 @@
  *   - Add the ability to specify the "Level" for each eventtype (rather than trying to automatically calculate it)
  *   - Add the ability to test an alert level of "Other"
  *   - Add the ability to set the length of the test alerts
+ *
+ * Last Update: 02/17/2022 (v1.1.001)
+ *   - Fix a typo/bug affecting "Other" events
  */
 
-static String version() { return "1.1.000" }
+static String version() { return "1.1.001" }
 
 import groovy.transform.Field
 import groovy.json.*
@@ -360,7 +363,7 @@ void getAlertMsg() {
                    || (monitoredWeatherEventsWarning && monitoredWeatherEventsWarning*.toLowerCase().contains(alerteventtype.toLowerCase())) ) alertlevel="Warning"
          else if ( !(monitoredWeatherEventsWatch) || (monitoredWeatherEventsWatch.size() == 0)
                    || (monitoredWeatherEventsWatch && monitoredWeatherEventsWatch*.toLowerCase().contains(alerteventtype.toLowerCase())) ) alertlevel="Watch"
-         else alertLevel="Other" 
+         else alertlevel="Other" 
           
          if(debugEnable) log.debug "Level: $alertlevel"
 
