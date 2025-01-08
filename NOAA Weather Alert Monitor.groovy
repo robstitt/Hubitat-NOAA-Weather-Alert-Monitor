@@ -3,7 +3,7 @@
  *  Hubitat Import URL:
  *
  *  Copyright 2019 Aaron Ward
- *  Copyright 2021-2022 Robert L. Stitt
+ *  Copyright 2021-2025 Robert L. Stitt
  *
  *-------------------------------------------------------------------------------------------------------------------
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
@@ -30,9 +30,13 @@
  *
  * Last Update: 02/17/2022 (v1.1.001)
  *   - Fix a typo/bug affecting "Other" events
+ *
+ * Last Update: 01/08/2025 (v1.1.002)
+ *   - Fix a bug where LastAlert wasn't ever defined, triggering an error (in "getWeatherAlerts()")
+ *   - Fix a bug when results were't received from the API (e.g., no internet)
  */
 
-static String version() { return "1.1.001" }
+static String version() { return "1.1.002" }
 
 import groovy.transform.Field
 import groovy.json.*
@@ -80,7 +84,7 @@ def mainPage() {
             } else {
                 href(name: "ConfigPage", title: "${UIsupport("attention","")} Weather Alert Settings", required: false, page: "ConfigPage", description: "Change default settings for weather alerts to monitor")
             }
-                
+
             href(name: "DebugPage", title: "Debugging", required: false, page: "DebugPage", description: "Debug and Test Options")
             paragraph UIsupport("line","")
             paragraph UIsupport("footer","")
@@ -99,23 +103,23 @@ def ConfigPage() {
          List<String> tempWarningEvents = []
          List<String> tempWatchEvents = []
          List<String> tempOtherEvents = []
-          
+
          if (monitoredWeatherEventsWarning) tempWarningEvents = monitoredWeatherEventsWarning
          if (monitoredWeatherEventsWatch)   tempWatchEvents   = monitoredWeatherEventsWatch
          if (monitoredWeatherEventsOther)   tempOtherEvents   = monitoredWeatherEventsOther
-         
-         buildEventsList() 
-       
+
+         buildEventsList()
+
          if (state.eventTypes) tempAllEvents = state.eventTypes
-          
+
          List<String> possibleWarningEvents = ((tempAllEvents - tempWatchEvents) - tempOtherEvents)
-          
+
          input "monitoredWeatherEventsWarning", "enum", title: "Select all weather events to monitor as a Level=\"Warning\" event: ", required: false, multiple: true, submitOnChange: true,
             options: possibleWarningEvents
 
          if (monitoredWeatherEventsWarning) tempWarningEvents = monitoredWeatherEventsWarning
          List<String> possibleWatchEvents = ((tempAllEvents - tempWarningEvents) - tempOtherEvents)
-          
+
          input "monitoredWeatherEventsWatch", "enum", title: "Select all weather events to monitor as a Level=\"Watch\" event: ", required: false, multiple: true, submitOnChange: true,
             options: possibleWatchEvents
 
@@ -123,10 +127,10 @@ def ConfigPage() {
          List<String> possibleOtherEvents = ((tempAllEvents - tempWarningEvents) - tempWatchEvents)
 
          input "monitoredWeatherEventsOther", "enum", title: "Select all weather events to monitor as a Level=\"Other\" event: ", required: false, multiple: true, submitOnChange: true,
-            options: possibleOtherEvents       
+            options: possibleOtherEvents
 
          if (monitoredWeatherEventsOther)  tempOtherEvents = monitoredWeatherEventsOther
-          
+
          input name: "whatAlertSeverity", type: "enum", title: "Monitored severities: ", required: true, multiple: true, submitOnChange: true,
             options: [
                "Minor": "Minor",
@@ -187,7 +191,7 @@ def DebugPage() {
          input "logEnable", "bool", title: "Enable Normal Logging?", required: false, defaultValue: true, submitOnChange: true
 
          input "debugEnable", "bool", title: "Enable Debug Logging?", required: false, defaultValue: false, submitOnChange: true
-          
+
          input "testAlertLengthSeconds", "number", title: "Test Alert length in seconds (10-3600):", required: true, defaultValue: defaultTestAlertLengthSeconds, range: "10..3600", submitOnChange: true
 
          Integer tempTestAlertLength = defaultTestAlertLengthSeconds
@@ -198,7 +202,7 @@ def DebugPage() {
                  tempTestAlertLength = testAlertLengthSeconds
              }
          }
-          
+
          input "runTest", "enum", title: "Run a test Alert (for ${tempTestAlertLength.toString()} seconds)?", required: true, multiple: false, submitOnChange: true,
             options: [
                "no": "No",
@@ -206,7 +210,7 @@ def DebugPage() {
                "watch": "Watch",
                "warning": "Warning"
             ], defaultValue: "No"
-          
+
          if(runTest!=null && runTest!="no") {
             runtestAlert(runTest)
             app.updateSetting("runTest",[value:"no",type:"enum"])
@@ -316,16 +320,22 @@ void getAlertMsg() {
    List<String> monitoredWeatherEvents
 
    monitoredWeatherEvents = []
-          
+
    if (monitoredWeatherEventsWarning) monitoredWeatherEvents = monitoredWeatherEvents + monitoredWeatherEventsWarning
    if (monitoredWeatherEventsWatch)   monitoredWeatherEvents = monitoredWeatherEvents + monitoredWeatherEventsWatch
    if (monitoredWeatherEventsOther)   monitoredWeatherEvents = monitoredWeatherEvents + monitoredWeatherEventsOther
+
+   if ((result) && (result.features==null)) {
+      if (debugEnable) log.debug "Weather API returned NO entries"
+      result=null
+     }
 
    if(result) {
       Date curtime = new Date()
       String timestamp = curtime.format("yyyy-MM-dd'T'HH:mm:ssXXX")
 
       if (debugEnable) log.debug "Weather API returned ${result.features.size().toString()} entries"
+
       for(i=0; i<result.features.size();i++) {
          if(debugEnable) log.debug "In weather event loop, i=${i.toString()}"
 
@@ -344,7 +354,7 @@ void getAlertMsg() {
          Integer alertcertaintynum
          Integer alertseveritynum
          Integer alertlevelnum
-                    
+
          alertstatus    = (String)result.features[i].properties.status
          alerttext      = (String)result.features[i].properties.headline
          alerturgency   = result.features[i].properties.urgency
@@ -363,8 +373,8 @@ void getAlertMsg() {
                    || (monitoredWeatherEventsWarning && monitoredWeatherEventsWarning*.toLowerCase().contains(alerteventtype.toLowerCase())) ) alertlevel="Warning"
          else if ( !(monitoredWeatherEventsWatch) || (monitoredWeatherEventsWatch.size() == 0)
                    || (monitoredWeatherEventsWatch && monitoredWeatherEventsWatch*.toLowerCase().contains(alerteventtype.toLowerCase())) ) alertlevel="Watch"
-         else alertlevel="Other" 
-          
+         else alertlevel="Other"
+
          if(debugEnable) log.debug "Level: $alertlevel"
 
          //alert starts
@@ -490,7 +500,7 @@ void getAlertMsg() {
 void runtestAlert(level) {
     Integer lengthSeconds=defaultTestAlertLengthSeconds
     if (testAlertLengthSeconds!=null) lengthSeconds = testAlertLengthSeconds
-    
+
     TestInProgress=true
     if (HighestAlert==null || HighestAlert.text==null || HighestAlert.level==null) {
         if (debugEnable) log.debug "Initializing Highest Alert variable (it was null)"
@@ -502,7 +512,7 @@ void runtestAlert(level) {
     if(logEnable) log.info "Initiating a test ${level} alert for ${lengthInSeconds.toString()} (saving the current Highest Alert: ${SavedRealAlert.level}(${SavedRealAlert.text}))"
     if(level=="warning") HighestAlert=buildTestWarningAlert()
     if(level=="watch")   HighestAlert=buildTestWatchAlert()
-    if(level=="other")   HighestAlert=buildTestOtherAlert()    
+    if(level=="other")   HighestAlert=buildTestOtherAlert()
     setAlertSwitch()
     callRefreshAlertDevice()
     runIn(lengthSeconds,endTest)
@@ -517,13 +527,13 @@ void endTest(){
    callRefreshAlertDevice()
 }
 
-                  
+
 Map buildTestOtherAlert() {
    Date date = new Date()
    String timestamp = date.format("yyyy-MM-dd'T'HH:mm:ssXXX")
    return [text:"Test Other", level:"Other", urgency:"Expected", certainty:"Likely", severity:"Severe", eventtype:"Test Other", expires:"${timestamp}"]
 }
-                 
+
 Map buildTestWatchAlert() {
    Date date = new Date()
    String timestamp = date.format("yyyy-MM-dd'T'HH:mm:ssXXX")
@@ -625,6 +635,12 @@ Map getWeatherAlerts() {
    }
    catch (e) {
       if(logEnable) log.warn "The API Weather.gov did not return a response (retaining previous results), exception: $e"
+
+      if (LastAlertResult==null || LastAlertResult.text==null || LastAlertResult.level==null) {
+          if (debugEnable) log.debug "Initializing LastAlert variable (it was null)"
+          LastAlertResult = emptyAlert()
+      }
+
       result = LastAlertResult.clone()
    }
 
