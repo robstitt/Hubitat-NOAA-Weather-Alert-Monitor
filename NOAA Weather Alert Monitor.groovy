@@ -34,9 +34,12 @@
  * Last Update: 01/08/2025 (v1.1.002)
  *   - Fix a bug where LastAlert wasn't ever defined, triggering an error (in "getWeatherAlerts()")
  *   - Fix a bug when results were't received from the API (e.g., no internet)
+ *
+ * Last Update: 01/20/2025 (v1.1.003)
+ *   - Added ",[misfire:ignore]" to runIn calls
  */
 
-static String version() { return "1.1.002" }
+static String version() { return "1.1.003" }
 
 import groovy.transform.Field
 import groovy.json.*
@@ -515,7 +518,7 @@ void runtestAlert(level) {
     if(level=="other")   HighestAlert=buildTestOtherAlert()
     setAlertSwitch()
     callRefreshAlertDevice()
-    runIn(lengthSeconds,endTest)
+    runIn(lengthSeconds,endTest,[misfire:ignore])
 }
 
 void endTest(){
@@ -675,8 +678,8 @@ void initialize() {
     SavedRealAlert=emptyAlert()
     createChildDevices()
     callRefreshAlertDevice()
-    runIn(2,main)
-    runIn(5,setRefresh)
+    runIn(2,main,[misfire:ignore])
+    runIn(5,setRefresh,[misfire:ignore])
 }
 
 void setRefresh() {
